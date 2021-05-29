@@ -62,9 +62,37 @@ std::string AsciiToUtf8(const std::string& str)
 	return UnicodeToUtf8(AsciiToUnicode(str));
 }
 
-
+// 回调函数1 接收所有数据
 //回调函数
-static size_t write_data(void* ptr, size_t size, size_t nmemb, void* stream)
+struct memory 
+{
+	char* response;
+	size_t size;
+	memory()
+	{
+		response = NULL;
+		size = 0;
+	}
+};
+
+size_t write_data1(void* data, size_t size, size_t nmemb, void* userp)
+{
+	size_t realsize = size * nmemb;
+	struct memory* mem = (struct memory*)userp;
+	char* ptr = (char*)realloc(mem->response, mem->size + realsize + 1);
+	if (ptr == NULL)
+		return 0;
+
+	mem->response = ptr;
+	memcpy(&(mem->response[mem->size]), data, realsize);
+	mem->size += realsize;
+	mem->response[mem->size] = 0;
+
+	return realsize;
+}
+
+// 回调函数2 数据长的话只接收最后一次数据
+static size_t write_data2(void* ptr, size_t size, size_t nmemb, void* stream)
 {
     std::cout << "****** predict done! ******" << std::endl;
     std::string data((const char*)ptr, (size_t)size * nmemb);
@@ -106,7 +134,9 @@ bool reqMeshCNNFileUpload(std::string IP, std::string Port, const char* dentalPa
 	}
 
 	//设置接收数据的处理函数和存放变量
-	curl_easy_setopt(curl, CURLOPT_WRITEDATA, &result);
+	struct memory stBody;  
+	curl_easy_setopt(curl, CURLOPT_WRITEDATA, (void*)&stBody);
+	//curl_easy_setopt(curl, CURLOPT_WRITEDATA, &result);
 
 	//初始化form
 	curl_mime* form;
@@ -135,6 +165,7 @@ bool reqMeshCNNFileUpload(std::string IP, std::string Port, const char* dentalPa
 		printf("curl_easy_perform failed! {}\n");
 		return false;
 	}
+	result = stBody.response;
 
 	// 释放资源
 	curl_slist_free_all(headers);
@@ -186,16 +217,11 @@ bool reqMeshCNNFilePath(std::string IP, std::string Port, const char* dentalPath
 		return false;
 	}
 
-	// 设置回调函数，如果不设置，默认输出到控制台
-	code = curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, write_data);
-	if (code != CURLE_OK) {
-		printf("failed to set write data.\n");
-		return false;
-	}
-
 	//设置接收数据的处理函数和存放变量
 	curl_easy_setopt(curl, CURLOPT_POSTFIELDS, strResult.c_str());
-	curl_easy_setopt(curl, CURLOPT_WRITEDATA, &result);
+	struct memory stBody;  
+	curl_easy_setopt(curl, CURLOPT_WRITEDATA, (void*)&stBody);
+	//curl_easy_setopt(curl, CURLOPT_WRITEDATA, &result);
 
 	//HTTP报文头
 	struct curl_slist* headers = nullptr;
@@ -213,6 +239,7 @@ bool reqMeshCNNFilePath(std::string IP, std::string Port, const char* dentalPath
 		printf("curl_easy_perform failed! {}\n");
 		return false;
 	}
+	result = stBody.response;
 
 	curl_slist_free_all(headers);
 	/* always cleanup */

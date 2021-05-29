@@ -27,5 +27,8 @@ include_directories( ${CURL_INCLUDE_DIRS} ${JSONCPP_INCLUDE_DIR} )
 link_directories( ${CURL_LIBRARIES} )
 
 add_executable(curl_test ${SRCS} ${JSONCPP_SOURCES})
-target_link_libraries(curl_test libcurl_a.lib ws2_32 wldap32)
-
+if(WIN32)
+	target_link_libraries(curl_test libcurl_a.lib ws2_32 wldap32)
+elseif(UNIX)
+	target_link_libraries(curl_test libcurl.a pthread)
+endif()
